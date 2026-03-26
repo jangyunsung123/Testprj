@@ -1,229 +1,319 @@
 package pokemonAj;
 
+import javax.swing.*;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 
 public class BattleEngine {
 
-	private Scanner scanner = new Scanner(System.in);
+	private BattleLogger logger = System.out::println;
+	private Component parentComponent;
 
-	public boolean startBattle(ArrayList<Pokemon> playerParty, Pokemon wildPokemon) {
-		System.out.println("\n╔═══════════════════════════════╗");
-		System.out.println("야생의 " + wildPokemon.getName() + "이(가) 나타났다!");
-		System.out.println("╚═══════════════════════════════╝\n");
+	public void setLogger(BattleLogger logger) {
+		if (logger != null) {
+			this.logger = logger;
+		}
+	}
+
+	public void setParentComponent(Component parentComponent) {
+		this.parentComponent = parentComponent;
+	}
+
+	public void setLogArea(JTextArea logArea) {
+		if (logArea == null) return;
+
+		setLogger(message -> {
+			logArea.append(message + "\n");
+			logArea.setCaretPosition(logArea.getDocument().getLength());
+		});
+	}
+
+	private void printLog(String message) {
+		logger.log(message);
+	}
+
+	public boolean startBattle(ArrayList<Pokemon> playerParty, Pokemon enemyPokemon) {
+		printLog("");
+		printLog("╔═══════════════════════════════╗");
+		printLog(" 야생의 " + enemyPokemon.getName() + "이(가) 나타났다!");
+		printLog("╚═══════════════════════════════╝");
 
 		Pokemon mine = getFirstAlive(playerParty);
 		if (mine == null) {
-			System.out.println("싸울 수 있는 포켓몬이 없다!");
+			printLog("싸울 수 있는 포켓몬이 없다!");
 			return false;
 		}
 
-		System.out.println("가라! " + mine.getName() + "!\n");
+		printLog("가라! " + mine.getName() + "!");
 
 		while (true) {
-			printStatus(mine, wildPokemon);
-			int action = chooseAction();
+			printStatus(mine, enemyPokemon);
 
-			if (action == 1) { // 싸운다
+			int action = chooseAction(mine, playerParty);
+			if (action == -1) {
+				continue;
+			}
+
+			if (action == 0) { // 싸운다
 				Skill move = chooseSkill(mine);
 				if (move == null) continue;
 
-				if (!mine.getStatusEffect().canAct(mine)) {
-					endOfTurn(mine, wildPokemon);
-					if (wildPokemon.isFainted()) { printWin(wildPokemon); return true; }
+				if (!mine.getStatusEffect().canAct(mine, logger)) {
+					endOfTurn(mine, enemyPokemon);
 					mine = checkMyFainted(mine, playerParty);
 					if (mine == null) return false;
+					if (enemyPokemon.isFainted()) {
+						printWin(enemyPokemon);
+						return true;
+					}
 					continue;
 				}
 
-				doAttack(mine, move, wildPokemon);
-				if (wildPokemon.isFainted()) { printWin(wildPokemon); return true; }
-
-				if (wildPokemon.getStatusEffect().canAct(wildPokemon)) {
-					Skill wildSkill = getRandomSkill(wildPokemon);
-					if (wildSkill != null) doAttack(wildPokemon, wildSkill, mine);
+				doAttack(mine, move, enemyPokemon);
+				if (enemyPokemon.isFainted()) {
+					printWin(enemyPokemon);
+					return true;
 				}
 
-				endOfTurn(mine, wildPokemon);
-				if (wildPokemon.isFainted()) { printWin(wildPokemon); return true; }
+				if (!enemyPokemon.getStatusEffect().canAct(enemyPokemon, logger)) {
+					endOfTurn(mine, enemyPokemon);
+					mine = checkMyFainted(mine, playerParty);
+					if (mine == null) return false;
+					if (enemyPokemon.isFainted()) {
+						printWin(enemyPokemon);
+						return true;
+					}
+					continue;
+				}
 
+				enemyTurn(mine, enemyPokemon);
 				mine = checkMyFainted(mine, playerParty);
 				if (mine == null) return false;
-
-			} else if (action == 2) { // 포켓몬교체
+			}
+			else if (action == 1) { // 교체
 				Pokemon next = switchPokemon(playerParty, mine);
-				if (next != null) {
-					System.out.println("수고했어, " + mine.getName() + "! 들어와!");
+				if (next != null && next != mine) {
 					mine = next;
-					System.out.println("가라! " + mine.getName() + "!\n");
-
-					// 교체 후 야생 포켓몬 반격 (원작과 동일)
-					if (wildPokemon.getStatusEffect().canAct(wildPokemon)) {
-						Skill wildSkill = getRandomSkill(wildPokemon);
-						if (wildSkill != null) doAttack(wildPokemon, wildSkill, mine);
-					}
-
-					// 턴 마무리 (지속 데미지, 카운터 감소)
-					endOfTurn(mine, wildPokemon);
-
-					// 반격/턴 마무리 이후 기절 체크
+					printLog("가라! " + mine.getName() + "!");
+					enemyTurn(mine, enemyPokemon);
 					mine = checkMyFainted(mine, playerParty);
 					if (mine == null) return false;
 				}
-
-			} else if (action == 3) { // 도망간다
-				System.out.println("도망쳤다!");
-				return false;
-
-			} else {
-				System.out.println("1~3 중에서 입력하세요.");
 			}
+			else if (action == 2) { // 도망
+				if (Math.random() < 0.5) {
+					printLog("성공적으로 도망쳤다!");
+					return false;
+				} else {
+					printLog("도망치지 못했다!");
+					enemyTurn(mine, enemyPokemon);
+					mine = checkMyFainted(mine, playerParty);
+					if (mine == null) return false;
+				}
+			}
+
+			endOfTurn(mine, enemyPokemon);
+
+			if (enemyPokemon.isFainted()) {
+				printWin(enemyPokemon);
+				return true;
+			}
+
+			mine = checkMyFainted(mine, playerParty);
+			if (mine == null) return false;
 		}
 	}
 
-	private Pokemon switchPokemon(ArrayList<Pokemon> party, Pokemon current) {
-		System.out.println("\n╔═══════════════════════════════════╗");
-		System.out.println("포켓몬을 선택하세요:");
-		for (int i = 0; i < party.size(); i++) {
-			Pokemon p = party.get(i);
-			if (p == current) { // 문자열 
-				System.out.printf("  [%d] %-8s HP: %3d / %3d  (출전 중)%n", i + 1, p.getName(), p.getHp(), p.getMaxHp());
-			} else if (p.isFainted()) {
-				System.out.printf("  [%d] %-8s [기절]%n", i + 1, p.getName());
-			} else {
-				System.out.printf("  [%d] %-8s HP: %3d / %3d%n", i + 1, p.getName(), p.getHp(), p.getMaxHp());
-			}
-		}
-		System.out.println("╚════════════════════════════════════╝\n");
+	private void doAttack(Pokemon attacker, Skill skill, Pokemon target) {
+		printLog(attacker.getName() + "의 " + skill.getName() + "!");
 
-		while (true) {
-			try {
-				int idx = Integer.parseInt(scanner.nextLine().trim()) - 1;
-				if (idx < 0 || idx >= party.size()) {
-					System.out.println("올바른 번호를 입력하세요.");
-					continue;
-				}
-				Pokemon selected = party.get(idx);
-				if (selected == current) {
-					System.out.println("이미 출전 중인 포켓몬입니다!");
-					continue;
-				}
-				if (selected.isFainted()) {
-					System.out.println("기절한 포켓몬은 선택할 수 없습니다!");
-					continue;
-				}
-				return selected;
-			} catch (NumberFormatException e) {
-				System.out.println("올바른 번호를 입력하세요.");
-			}
-		}
-	}
-
-	private void doAttack(Pokemon attacker, Skill move, Pokemon defender) {
-		System.out.println(attacker.getName() + "의 " + move.getName() + "!");
-
-		if (move.isStatusMove()) {
-			tryInflictStatus(move, defender);
+		if (skill.isStatusMove()) {
+			applySkillEffect(skill, target);
 			return;
 		}
 
-		double mult = TypeEffect.getMultiplier(move.getType(), defender.getType1(), defender.getType2());
-		String effMsg = TypeEffect.getEffectMessage(mult);
-		if (!effMsg.isEmpty()) System.out.println(effMsg);
+		double multiplier = TypeEffect.getMultiplier(
+				normalizeType(skill.getType()),
+				normalizeType(target.getType1()),
+				normalizeType(target.getType2())
+		);
 
-		int dmg = calculateDamage(attacker, move, mult);
-		if (attacker.getStatusEffect().isBurned()) dmg /= 2;
+		int baseDamage = attacker.getAttack() + skill.getPower() / 5;
+		int damage = Math.max(1, (int) (baseDamage * multiplier));
 
-		defender.takeDamage(dmg);
-		// System.out.println("→ " + defender.getName() + "에게 " + dmg + "의 데미지!"); // 데미지 얼마나 들어갔는지 확인하고 싶으면 이거 추가
+		target.takeDamage(damage);
+		printLog(target.getName() + "에게 " + damage + "의 데미지!");
 
-		tryInflictStatus(move, defender);
+		String effectMessage = TypeEffect.getEffectMessage(multiplier);
+		if (!effectMessage.isEmpty()) {
+			printLog(effectMessage);
+		}
+
+		applySkillEffect(skill, target);
 	}
 
-	private void tryInflictStatus(Skill move, Pokemon target) {
-		if (move.getStatusEffect().equals(StatusEffect.NONE)) return;
-		if (!target.getStatusEffect().getStatus().equals(StatusEffect.NONE)) return;
-		int roll = (int) (Math.random() * 100);
-		if (roll < move.getStatusChance()) {
-			target.getStatusEffect().apply(move.getStatusEffect());
-			System.out.println(target.getName() + "은(는) " + move.getStatusEffect() + " 상태가 됐다!");
+	private void applySkillEffect(Skill skill, Pokemon target) {
+		String effect = skill.getStatusEffect();
+		int chance = skill.getStatusChance();
+
+		if (!StatusEffect.NONE.equals(effect)) {
+			if (Math.random() * 100 < chance) {
+				if (StatusEffect.NONE.equals(target.getStatusEffect().getStatus())) {
+					target.getStatusEffect().apply(effect);
+					printLog(target.getName() + "은(는) " + effect + " 상태가 되었다!");
+				}
+			}
 		}
 	}
 
-	private int calculateDamage(Pokemon attacker, Skill move, double multiplier) {
-		return (int) (attacker.getAttack() * move.getPower() * multiplier / 50.0);
+	private void enemyTurn(Pokemon mine, Pokemon enemy) {
+		Skill enemySkill = enemy.getSkills().get((int) (Math.random() * enemy.getSkills().size()));
+		printLog("야생의 " + enemy.getName() + "의 " + enemySkill.getName() + "!");
+
+		if (enemySkill.isStatusMove()) {
+			applySkillEffect(enemySkill, mine);
+			return;
+		}
+
+		double multiplier = TypeEffect.getMultiplier(
+				normalizeType(enemySkill.getType()),
+				normalizeType(mine.getType1()),
+				normalizeType(mine.getType2())
+		);
+
+		int baseDamage = enemy.getAttack() + enemySkill.getPower() / 5;
+		int damage = Math.max(1, (int) (baseDamage * multiplier));
+
+		mine.takeDamage(damage);
+		printLog(mine.getName() + "은(는) " + damage + "의 데미지를 입었다!");
+
+		String effectMessage = TypeEffect.getEffectMessage(multiplier);
+		if (!effectMessage.isEmpty()) {
+			printLog(effectMessage);
+		}
+
+		applySkillEffect(enemySkill, mine);
 	}
 
-	private void endOfTurn(Pokemon mine, Pokemon wild) {
-		mine.getStatusEffect().applyEndOfTurn(mine);
-		wild.getStatusEffect().applyEndOfTurn(wild);
+	private void endOfTurn(Pokemon mine, Pokemon enemy) {
+		if (mine != null) {
+			mine.getStatusEffect().applyEndOfTurn(mine, logger);
+		}
+		if (enemy != null) {
+			enemy.getStatusEffect().applyEndOfTurn(enemy, logger);
+		}
+	}
+
+	private void printWin(Pokemon enemy) {
+		printLog(enemy.getName() + "은(는) 쓰러졌다! 전투에서 승리했다!");
 	}
 
 	private Pokemon checkMyFainted(Pokemon mine, ArrayList<Pokemon> party) {
-		if (!mine.isFainted()) return mine;
-		System.out.println(mine.getName() + "은(는) 쓰러졌다!");
-		Pokemon next = getFirstAlive(party);
-		if (next == null) {
-			System.out.println("\n눈앞이 깜깜해졌다...\n");
-			return null;
-		}
-		System.out.println("가라! " + next.getName() + "!\n");
-		return next;
-	}
-
-	private void printWin(Pokemon wild) {
-		System.out.println(wild.getName() + "은(는) 쓰러졌다!");
-		System.out.println("전투에서 이겼다!\n");
-	}
-
-	private void printStatus(Pokemon mine, Pokemon wild) {
-		System.out.println("──────────────────────────────");
-		System.out.printf("[적] %-8s HP: %3d / %3d  [%s]%n", wild.getName(), wild.getHp(), wild.getMaxHp(),
-				wild.getStatusEffect().getStatus());
-		System.out.printf("[나] %-8s HP: %3d / %3d  [%s]%n", mine.getName(), mine.getHp(), mine.getMaxHp(),
-				mine.getStatusEffect().getStatus());
-		System.out.println("──────────────────────────────");
-	}
-
-	private int chooseAction() {
-		System.out.println("[1] 싸운다   [2] 포켓몬교체   [3] 도망간다");
-		try {
-			return Integer.parseInt(scanner.nextLine().trim());
-		} catch (NumberFormatException e) {
-			return -1;
-		}
-	}
-
-	private Skill chooseSkill(Pokemon pokemon) {
-		List<Skill> moves = pokemon.getSkills();
-		System.out.println("기술을 선택하세요:");
-		for (int i = 0; i < moves.size(); i++) {
-			Skill m = moves.get(i);
-			System.out.printf("  [%d] %-14s 타입: %-6s 위력: %3d%n", i + 1, m.getName(), m.getType(), m.getPower());
-		}
-		try {
-			int idx = Integer.parseInt(scanner.nextLine().trim()) - 1;
-			if (idx < 0 || idx >= moves.size()) {
-				System.out.println("올바른 번호를 입력하세요.");
-				return null;
+		if (mine != null && mine.isFainted()) {
+			printLog(mine.getName() + "은(는) 쓰러졌다!");
+			Pokemon next = getFirstAlive(party);
+			if (next != null) {
+				printLog("가라! " + next.getName() + "!");
 			}
-			return moves.get(idx);
-		} catch (NumberFormatException e) {
-			return null;
+			return next;
 		}
-	}
-
-	private Skill getRandomSkill(Pokemon pokemon) {
-		List<Skill> moves = pokemon.getSkills();
-		if (moves.isEmpty()) return null;
-		return moves.get((int) (Math.random() * moves.size()));
+		return mine;
 	}
 
 	private Pokemon getFirstAlive(ArrayList<Pokemon> party) {
 		for (Pokemon p : party) {
-			if (!p.isFainted()) return p;
+			if (!p.isFainted()) {
+				return p;
+			}
 		}
 		return null;
+	}
+
+	private void printStatus(Pokemon mine, Pokemon enemy) {
+		printLog("──────────────────────────────");
+		printLog(String.format("[적] %-8s HP: %3d / %3d", enemy.getName(), enemy.getHp(), enemy.getMaxHp()));
+		printLog(String.format("[나] %-8s HP: %3d / %3d", mine.getName(), mine.getHp(), mine.getMaxHp()));
+		printLog("──────────────────────────────");
+	}
+
+	private int chooseAction(Pokemon mine, ArrayList<Pokemon> party) {
+		String[] options = {"싸운다", "포켓몬 교체", "도망간다"};
+		return JOptionPane.showOptionDialog(
+				parentComponent,
+				"행동을 선택하세요.\n현재 포켓몬: " + mine.getName(),
+				"배틀",
+				JOptionPane.DEFAULT_OPTION,
+				JOptionPane.PLAIN_MESSAGE,
+				null,
+				options,
+				options[0]
+		);
+	}
+
+	private Skill chooseSkill(Pokemon pokemon) {
+		List<Skill> moves = pokemon.getSkills();
+		if (moves.isEmpty()) return null;
+
+		String[] options = new String[moves.size()];
+		for (int i = 0; i < moves.size(); i++) {
+			Skill s = moves.get(i);
+			options[i] = s.getName() + " | 타입: " + s.getType() + " | 위력: " + s.getPower();
+		}
+
+		int selected = JOptionPane.showOptionDialog(
+				parentComponent,
+				"기술을 선택하세요.",
+				pokemon.getName() + "의 기술",
+				JOptionPane.DEFAULT_OPTION,
+				JOptionPane.PLAIN_MESSAGE,
+				null,
+				options,
+				options[0]
+		);
+
+		if (selected < 0 || selected >= moves.size()) {
+			return null;
+		}
+		return moves.get(selected);
+	}
+
+	private Pokemon switchPokemon(ArrayList<Pokemon> party, Pokemon current) {
+		ArrayList<Pokemon> selectable = new ArrayList<>();
+		ArrayList<String> names = new ArrayList<>();
+
+		for (Pokemon p : party) {
+			if (!p.isFainted() && p != current) {
+				selectable.add(p);
+				names.add(p.getName() + " | HP " + p.getHp() + "/" + p.getMaxHp());
+			}
+		}
+
+		if (selectable.isEmpty()) {
+			printLog("교체할 수 있는 포켓몬이 없습니다.");
+			return null;
+		}
+
+		int selected = JOptionPane.showOptionDialog(
+				parentComponent,
+				"교체할 포켓몬을 선택하세요.",
+				"포켓몬 교체",
+				JOptionPane.DEFAULT_OPTION,
+				JOptionPane.PLAIN_MESSAGE,
+				null,
+				names.toArray(),
+				names.get(0)
+		);
+
+		if (selected < 0 || selected >= selectable.size()) {
+			return null;
+		}
+
+		return selectable.get(selected);
+	}
+
+	private String normalizeType(String type) {
+		if ("불".equals(type)) return "불꽃";
+		return type;
 	}
 }
