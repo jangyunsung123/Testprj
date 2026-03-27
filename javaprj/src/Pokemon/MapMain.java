@@ -1,4 +1,4 @@
-package pokemonAj;
+package Pokemon;
 
 import java.util.Random;
 import java.util.Scanner;
@@ -12,6 +12,7 @@ public class MapMain {
 		MapPlayer player = new MapPlayer();
 		
 		System.out.println("포켓몬스터의 세계에 온 걸 환영한다!");
+		
 		while(true) {
 			for(int i=0; i<20; i++) System.out.println();
 			
