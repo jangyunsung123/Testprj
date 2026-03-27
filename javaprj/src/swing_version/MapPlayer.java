@@ -7,7 +7,17 @@ public class MapPlayer {
 
     int x = 1;
     int y = 1;
+
+    private String name;
     private ArrayList<Pokemon> party = new ArrayList<>();
+
+    public String getName() {
+        return name == null || name.isBlank() ? "이름없음" : name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 
     public void healAll() {
         for (Pokemon p : party) {
@@ -54,16 +64,17 @@ public class MapPlayer {
         for (int i = 0; i < party.size(); i++) {
             Pokemon p = party.get(i);
             sb.append(i + 1)
-              .append(". ")
-              .append(p.getName())
-              .append(" | 타입: ")
-              .append(p.getType())
-              .append(" | Lv.")
-              .append(p.getLevel())
-              .append(" | HP ")
-              .append(p.getHp())
-              .append("/")
-              .append(p.getMaxHp());
+                    .append(". ")
+                    .append(p.getName())
+                    .append(" | 타입: ")
+                    .append(p.getType())
+                    .append(" | Lv.")
+                    .append(p.getLevel())
+                    .append(" | HP ")
+                    .append(p.getHp())
+                    .append("/")
+                    .append(p.getMaxHp());
+
             if (p.isFainted()) sb.append(" [기절]");
             if (i < party.size() - 1) sb.append("\n");
         }

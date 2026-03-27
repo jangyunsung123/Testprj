@@ -27,14 +27,14 @@ public class BattleEngine {
     }
 
     private void printLog(String message) {
-        logger.log(message);
+        logger.log(BT_Dialog.format(message));
     }
 
     public boolean startBattle(ArrayList<Pokemon> playerParty, Pokemon enemyPokemon) {
         printLog("");
-        printLog("╔═══════════════════════════════╗");
+       // printLog("╔═══════════════════════════════╗");
         printLog(" 야생의 " + enemyPokemon.getName() + "이(가) 나타났다!");
-        printLog("╚═══════════════════════════════╝");
+        //printLog("╚═══════════════════════════════╝");
 
         Pokemon mine = getFirstAlive(playerParty);
         if (mine == null) {
@@ -60,6 +60,7 @@ public class BattleEngine {
                     if (mine == null) return false;
                     if (enemyPokemon.isFainted()) {
                         printWin(enemyPokemon);
+                        handlePostBattle(mine, enemyPokemon);
                         return true;
                     }
                     continue;
@@ -68,6 +69,7 @@ public class BattleEngine {
                 doAttack(mine, move, enemyPokemon);
                 if (enemyPokemon.isFainted()) {
                     printWin(enemyPokemon);
+                    handlePostBattle(mine, enemyPokemon);
                     return true;
                 }
 
@@ -77,6 +79,7 @@ public class BattleEngine {
                     if (mine == null) return false;
                     if (enemyPokemon.isFainted()) {
                         printWin(enemyPokemon);
+                        handlePostBattle(mine, enemyPokemon);
                         return true;
                     }
                     continue;
@@ -110,6 +113,7 @@ public class BattleEngine {
             endOfTurn(mine, enemyPokemon);
             if (enemyPokemon.isFainted()) {
                 printWin(enemyPokemon);
+                handlePostBattle(mine, enemyPokemon);
                 return true;
             }
 
@@ -185,6 +189,132 @@ public class BattleEngine {
         printLog(enemy.getName() + "은(는) 쓰러졌다! 전투에서 승리했다!");
     }
 
+    // ─── 전투 승리 후 처리: 레벨업 → 기술 습득 → 진화 체크 ────────────────
+    private void handlePostBattle(Pokemon mine, Pokemon defeated) {
+        // 1) 레벨업
+        mine.levelUp();
+        printLog(mine.getName() + "의 레벨이 " + mine.getLevel() + "로 올랐다!");
+        printLog(String.format("  HP: %d  ATK: %d", mine.getMaxHp(), mine.getAttack()));
+
+        // 2) 레벨업 기술 습득 체크
+        String learnableName = BT_LearnSet.getLearnableSkill(mine.getName(), mine.getLevel());
+        if (learnableName != null) {
+            printLog(mine.getName() + "은(는) " + learnableName + "을(를) 떠올렸다!");
+            String[] learnOptions = {"배운다", "배우지 않는다"};
+            int learnChoice = JOptionPane.showOptionDialog(
+                    parentComponent,
+                    mine.getName() + "은(는) " + learnableName + "을(를) 배울 수 있다!",
+                    "기술 습득",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
+                    learnOptions, learnOptions[0]);
+            if (learnChoice == 0) {
+                tryLearnSkill(mine, learnableName);
+            } else {
+                printLog(learnableName + "을(를) 배우지 않았다.");
+            }
+        }
+
+        // 3) 진화 체크
+        if (BT_Evolution.canEvolve(mine.getName(), mine.getLevel())) {
+            String evolvedName = BT_Evolution.getEvolvedName(mine.getName());
+            printLog("어라? " + mine.getName() + "의 모습이...!");
+            String[] evoOptions = {"진화한다", "진화하지 않는다"};
+            int evoChoice = JOptionPane.showOptionDialog(
+                    parentComponent,
+                    mine.getName() + "이(가) " + evolvedName + "로 진화할 수 있다!",
+                    "진화",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
+                    evoOptions, evoOptions[0]);
+            if (evoChoice == 0) {
+                printLog("축하합니다! " + mine.getName() + "은(는) " + evolvedName + "로 진화했다!");
+                mine.evolve(evolvedName);
+            } else {
+                printLog(mine.getName() + "은(는) 진화를 거부했다.");
+            }
+        }
+    }
+
+    // ─── 기술 습득 처리: 빈 슬롯이면 바로 추가, 꽉 찼으면 교체 선택 ────────
+    private void tryLearnSkill(Pokemon mine, String skillName) {
+        Skill newSkill = createSkillByName(skillName);
+        if (newSkill == null) {
+            printLog("(기술 데이터를 찾을 수 없어 배우지 못했다.)");
+            return;
+        }
+        if (mine.canLearnSkill()) {
+            mine.addSkill(newSkill);
+            printLog(mine.getName() + "은(는) " + skillName + "을(를) 배웠다!");
+        } else {
+            List<Skill> skills = mine.getSkills();
+            String[] options = new String[skills.size() + 1];
+            for (int i = 0; i < skills.size(); i++) {
+                Skill s = skills.get(i);
+                options[i] = s.getName() + " (" + s.getType() + ", 위력 " + s.getPower() + ")";
+            }
+            options[skills.size()] = skillName + "을(를) 배우지 않는다";
+
+            int choice = JOptionPane.showOptionDialog(
+                    parentComponent,
+                    "이미 기술이 4개입니다. 어떤 기술을 잊게 할까요?",
+                    "기술 교체",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
+                    options, options[0]);
+
+            if (choice < 0 || choice == skills.size()) {
+                printLog(mine.getName() + "은(는) " + skillName + "을(를) 배우지 않았다.");
+            } else {
+                String forgotName = skills.get(choice).getName();
+                mine.replaceSkill(choice, newSkill);
+                printLog(mine.getName() + "은(는) " + forgotName + "을(를) 잊고, " + skillName + "을(를) 배웠다!");
+            }
+        }
+    }
+
+    // ─── 기술 이름으로 Skill 객체 생성 ────────────────────────────────────────
+    private Skill createSkillByName(String name) {
+        switch (name) {
+            case "전광석화":        return new Skill("전광석화",       "노말",  40, "없음");
+            case "몸통박치기":      return new Skill("몸통박치기",     "노말",  40, "없음");
+            case "화염방사":        return new Skill("화염방사",       "불",    90, "화상 10%");
+            case "분화":            return new Skill("분화",           "불",   150, "없음");
+            case "불꽃세례":        return new Skill("불꽃세례",       "불",    60, "화상 30%");
+            case "파도타기":        return new Skill("파도타기",       "물",    90, "없음");
+            case "하이드로펌프":    return new Skill("하이드로펌프",   "물",   110, "없음");
+            case "물대포":          return new Skill("물대포",         "물",    40, "없음");
+            case "기가드레인":      return new Skill("기가드레인",     "풀",    90, "흡수");
+            case "솔라빔":          return new Skill("솔라빔",         "풀",   120, "없음");
+            case "잎날가르기":      return new Skill("잎날가르기",     "풀",    55, "없음");
+            case "10만볼트":        return new Skill("10만볼트",       "전기",  90, "마비 10%");
+            case "번개":            return new Skill("번개",           "전기", 110, "마비 30%");
+            case "전기쇼크":        return new Skill("전기쇼크",       "전기",  40, "마비 10%");
+            case "방전":            return new Skill("방전",           "전기",  80, "마비 10%");
+            case "냉동펀치":        return new Skill("냉동펀치",       "얼음",  75, "동상 10%");
+            case "눈사태":          return new Skill("눈사태",         "얼음",  60, "동상 10%");
+            case "인파이트":        return new Skill("인파이트",       "격투", 120, "없음");
+            case "파동탄":          return new Skill("파동탄",         "격투",  80, "없음");
+            case "맹독":            return new Skill("맹독",           "독",     0, "독 100%");
+            case "오물폭탄":        return new Skill("오물폭탄",       "독",    90, "독 30%");
+            case "악의파동":        return new Skill("악의파동",       "악",    80, "없음");
+            case "지진":            return new Skill("지진",           "땅",   100, "없음");
+            case "에어슬래시":      return new Skill("에어슬래시",     "비행",  75, "없음");
+            case "폭풍":            return new Skill("폭풍",           "비행", 110, "없음");
+            case "사이코키네시스":  return new Skill("사이코키네시스", "에스퍼", 90, "없음");
+            case "미래예지":        return new Skill("미래예지",       "에스퍼",120, "없음");
+            case "시저크로스":      return new Skill("시저크로스",     "벌레",  80, "없음");
+            case "스톤샤워":        return new Skill("스톤샤워",       "바위",  75, "없음");
+            case "섀도볼":          return new Skill("섀도볼",         "고스트", 80, "없음");
+            case "섀도다이브":      return new Skill("섀도다이브",     "고스트",120, "없음");
+            case "드래곤클로":      return new Skill("드래곤클로",     "드래곤", 80, "없음");
+            case "드래곤다이브":    return new Skill("드래곤다이브",   "드래곤",100, "없음");
+            case "역린":            return new Skill("역린",           "드래곤",120, "혼란 100%");
+            case "깜짝베기":        return new Skill("깜짝베기",       "악",    70, "없음");
+            case "문포스":          return new Skill("문포스",         "페어리", 95, "없음");
+            case "매지컬샤인":      return new Skill("매지컬샤인",     "페어리", 80, "없음");
+            case "수면가루":        return new Skill("수면가루",       "풀",     0, "수면 100%");
+            default:               return null;
+        }
+    }
+
     private Pokemon checkMyFainted(Pokemon mine, ArrayList<Pokemon> party) {
         if (mine != null && mine.isFainted()) {
             printLog(mine.getName() + "은(는) 쓰러졌다!");
@@ -203,10 +333,10 @@ public class BattleEngine {
     }
 
     private void printStatus(Pokemon mine, Pokemon enemy) {
-        printLog("──────────────────────────────");
+        //printLog("──────────────────────────────");
         printLog(String.format("[적] %-8s HP: %3d / %3d  [%s]", enemy.getName(), enemy.getHp(), enemy.getMaxHp(), enemy.getStatusEffect().getStatus()));
         printLog(String.format("[나] %-8s HP: %3d / %3d  [%s]", mine.getName(), mine.getHp(), mine.getMaxHp(), mine.getStatusEffect().getStatus()));
-        printLog("──────────────────────────────");
+        //printLog("──────────────────────────────");
     }
 
     private int chooseAction(Pokemon mine) {
@@ -224,7 +354,10 @@ public class BattleEngine {
     }
 
     private Skill chooseSkill(Pokemon pokemon) {
-        List<Skill> moves = pokemon.getSkills();
+        List<Skill> moves = new ArrayList<>();
+        for (Skill s : pokemon.getSkills()) {
+            if (s != null) moves.add(s);
+        }
         if (moves.isEmpty()) return null;
 
         String[] options = new String[moves.size()];
@@ -280,7 +413,10 @@ public class BattleEngine {
     }
 
     private Skill getRandomSkill(Pokemon pokemon) {
-        List<Skill> moves = pokemon.getSkills();
+        List<Skill> moves = new ArrayList<>();
+        for (Skill s : pokemon.getSkills()) {
+            if (s != null) moves.add(s);
+        }
         if (moves.isEmpty()) return null;
         return moves.get((int) (Math.random() * moves.size()));
     }
