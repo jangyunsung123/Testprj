@@ -9,10 +9,12 @@ public class MapMain extends JFrame {
 
     private final Map map;
     private final MapPlayer player;
-    private final JTextArea logArea;
     private final MapPanel mapPanel;
     private final Pokedex pokedex;
     private final BattleEngine battleEngine;
+
+    private final JPanel logPanel;
+    private final JScrollPane logScrollPane;
 
     private JLabel playerNameLabel;
     private JLabel firstPokemonLabel;
@@ -24,29 +26,36 @@ public class MapMain extends JFrame {
         battleEngine = new BattleEngine();
 
         setTitle("포켓몬 게임");
-        setSize(1200, 800);
+        setSize(1200, 900);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
         mapPanel = new MapPanel(map, this.player);
 
-        logArea = new JTextArea();
-        logArea.setEditable(false);
-        logArea.setLineWrap(true);
-        logArea.setWrapStyleWord(true);
-        logArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        JPanel gamePanel = new JPanel(new BorderLayout());
+        gamePanel.add(mapPanel, BorderLayout.CENTER);
+        gamePanel.add(createRightPanel(), BorderLayout.EAST);
 
-        JScrollPane scrollPane = new JScrollPane(logArea);
-        scrollPane.setPreferredSize(new Dimension(1200, 220));
-        scrollPane.setBorder(BorderFactory.createTitledBorder("로그"));
+        logPanel = new JPanel();
+        logPanel.setLayout(new BoxLayout(logPanel, BoxLayout.Y_AXIS));
+        logPanel.setBackground(new Color(245, 248, 252));
+        logPanel.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+
+        logScrollPane = new JScrollPane(
+                logPanel,
+                JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+        );
+        logScrollPane.setPreferredSize(new Dimension(1200, 340));
+        logScrollPane.setBorder(BorderFactory.createTitledBorder("로그"));
+        logScrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
         battleEngine.setParentComponent(this);
-        battleEngine.setLogArea(logArea);
+        battleEngine.setLogger(this::appendLog);
 
-        add(mapPanel, BorderLayout.CENTER);
-        add(createRightPanel(), BorderLayout.EAST);
-        add(scrollPane, BorderLayout.SOUTH);
+        add(gamePanel, BorderLayout.CENTER);
+        add(logScrollPane, BorderLayout.SOUTH);
 
         initKeyBindings();
         setVisible(true);
@@ -265,8 +274,11 @@ public class MapMain extends JFrame {
             Pokemon legendaryPokemon = pokedex.getPokemon("기라티나");
             if (legendaryPokemon != null) {
                 boolean won = battleEngine.startBattle(player.getParty(), legendaryPokemon.copy());
-                if (won) appendLog("체육관에서 승리했습니다!");
-                else handleAllFainted();
+                if (won) {
+                    appendLog("체육관에서 승리했습니다!");
+                } else {
+                    handleAllFainted();
+                }
             }
         } else {
             if (new Random().nextInt(100) < 2) {
@@ -337,7 +349,15 @@ public class MapMain extends JFrame {
     }
 
     private void appendLog(String message) {
-        logArea.append(message + "\n");
-        logArea.setCaretPosition(logArea.getDocument().getLength());
+        if (message == null) return;
+
+        logPanel.add(BT_Dialog.createMessageBox(message));
+        logPanel.revalidate();
+        logPanel.repaint();
+
+        SwingUtilities.invokeLater(() -> {
+            JScrollBar bar = logScrollPane.getVerticalScrollBar();
+            bar.setValue(bar.getMaximum());
+        });
     }
 }

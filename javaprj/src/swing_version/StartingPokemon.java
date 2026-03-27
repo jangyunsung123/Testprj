@@ -17,12 +17,12 @@ public class StartingPokemon {
 
 	public void showInfo() {
 		// TODO Auto-generated method stub
-		System.out.println("이름: " + name);
-        System.out.println("타입: " + type);
-        System.out.println("키: " + height + "m");
-        System.out.println("몸무게: " + weight + "kg");
-        System.out.println("설명: " + description);
-        System.out.println("---------------------");
+		BT_Dialog.show("이름: " + name);
+        BT_Dialog.show("타입: " + type);
+        BT_Dialog.show("키: " + height + "m");
+        BT_Dialog.show("몸무게: " + weight + "kg");
+        BT_Dialog.show("설명: " + description);
+        BT_Dialog.show("---------------------");
 	}
 
 	public String getName(){

@@ -38,4 +38,16 @@ class SaveManager {
             return new LoadResult(new ArrayList<>(), "불러오기 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
+
+    // ─── console 버전 메서드 (Gamecontroller 호환) ───────────────────────────
+    public static void saveGame(List<Pokemon> playerParty) {
+        BT_Dialog.show(saveGameMessage(playerParty));
+    }
+
+    @SuppressWarnings("unchecked")
+    public static List<Pokemon> loadGame() {
+        LoadResult result = loadGameWithMessage();
+        BT_Dialog.show(result.message);
+        return result.party;
+    }
 }

@@ -79,4 +79,32 @@ class Pokedex {
         }
         return sb.toString().trim();
     }
+
+    // ─── console 출력용 메서드 (Gamecontroller 호환) ──────────────────────────
+    public void displayAll() {
+        BT_Dialog.show("\n==== 포켓몬 도감 ====");
+        int idx = 1;
+        for (Pokemon p : pokemonDb.values()) {
+            BT_Dialog.show(idx + ". " + p.getName() + " | 타입: " + p.getType()
+                    + " | Lv." + p.getLevel() + " | HP " + p.getMaxHp()
+                    + " | ATK " + p.getAttack() + " | 등급: " + p.getRarity());
+            idx++;
+        }
+    }
+
+    public void displayOne(String pokemonName) {
+        Pokemon p = getPokemon(pokemonName);
+        if (p == null) { BT_Dialog.show("해당 포켓몬이 존재하지 않습니다."); return; }
+        BT_Dialog.show("\n==== " + p.getName() + " 상세 정보 ====");
+        BT_Dialog.show("타입: " + p.getType());
+        BT_Dialog.show("레벨: " + p.getLevel());
+        BT_Dialog.show("HP: " + p.getCurrentHp() + "/" + p.getMaxHp());
+        BT_Dialog.show("ATK: " + p.getAttack());
+        BT_Dialog.show("등급: " + p.getRarity());
+        BT_Dialog.show("스킬 목록:");
+        for (Skill s : p.getSkills()) {
+            BT_Dialog.show("  - " + s.getName() + " (" + s.getType() + ")"
+                    + " | 위력: " + s.getPower() + " | 효과: " + s.getEffect());
+        }
+    }
 }
