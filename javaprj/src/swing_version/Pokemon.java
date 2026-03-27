@@ -64,4 +64,5 @@ class Pokemon implements Serializable {
     public List<Skill> getSkills() { return skills; }
     public ArrayList<Skill> getMoves() { return new ArrayList<>(skills); }
     public StatusEffect getStatusEffect() { return statusEffect; }
+    public void setName(String name) {this.name = name;}
 }

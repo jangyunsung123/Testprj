@@ -43,13 +43,22 @@ class GameDataManager {
         Skill shadowDive    = new Skill("섀도다이브", "고스트", 120, "없음");
         Skill dragonPulse   = new Skill("용의파동", "드래곤", 85, "혼란 20%");
 
+        // 스타팅용 스킬 추가
+        Skill vineWhip      = new Skill("덩굴채찍", "풀", 45, "없음");
+        Skill razorLeaf     = new Skill("잎날가르기", "풀", 55, "없음");
+        Skill waterGun      = new Skill("물대포", "물", 40, "없음");
+        Skill bubble        = new Skill("거품", "물", 40, "없음");
+        Skill ember         = new Skill("불꽃세례", "불", 40, "화상 10%");
+        Skill scratch       = new Skill("할퀴기", "노말", 40, "없음");
+
         Skill[] allSkills = {
-            quickAttack, tackle, eruption, flamethrower, hydroPump, surf,
-            sleepPowder, gigaDrain, thunderbolt, thunderPunch, icyWind, icePunch,
-            forcePalm, closeCombat, sludgeBomb, toxic, earthquake, dragonClaw,
-            hurricane, confusionWave, psychic, xScissor, airSlash, rockSlide,
-            bulldoze, shadowBall, dragonDive, twister, discharge, thunderWave,
-            nightSlash, bite, moonblast, charm, shadowDive, dragonPulse
+                quickAttack, tackle, eruption, flamethrower, hydroPump, surf,
+                sleepPowder, gigaDrain, thunderbolt, thunderPunch, icyWind, icePunch,
+                forcePalm, closeCombat, sludgeBomb, toxic, earthquake, dragonClaw,
+                hurricane, confusionWave, psychic, xScissor, airSlash, rockSlide,
+                bulldoze, shadowBall, dragonDive, twister, discharge, thunderWave,
+                nightSlash, bite, moonblast, charm, shadowDive, dragonPulse,
+                vineWhip, razorLeaf, waterGun, bubble, ember, scratch
         };
         for (Skill s : allSkills) pokedex.addSkill(s);
 
@@ -71,6 +80,12 @@ class GameDataManager {
         pokedex.addPokemon(new Pokemon("코일", 12, 95, 39, "강철/전기", "Wild", Arrays.asList(discharge, thunderWave)));
         pokedex.addPokemon(new Pokemon("나옹", 11, 88, 37, "악", "Wild", Arrays.asList(nightSlash, bite)));
         pokedex.addPokemon(new Pokemon("삐삐", 12, 100, 33, "페어리", "Wild", Arrays.asList(moonblast, charm)));
+
+        // 스타팅 3마리 추가
+        pokedex.addPokemon(new Pokemon("이상해씨", 5, 100, 35, "풀", "Starter", Arrays.asList(vineWhip, razorLeaf)));
+        pokedex.addPokemon(new Pokemon("꼬부기", 5, 105, 34, "물", "Starter", Arrays.asList(waterGun, bubble)));
+        pokedex.addPokemon(new Pokemon("파이리", 5, 95, 38, "불", "Starter", Arrays.asList(ember, scratch)));
+
         pokedex.addPokemon(new Pokemon("기라티나", 30, 250, 70, "고스트/드래곤", "Legendary", Arrays.asList(shadowDive, dragonPulse)));
         return pokedex;
     }

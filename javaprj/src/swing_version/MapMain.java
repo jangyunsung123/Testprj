@@ -14,23 +14,23 @@ public class MapMain extends JFrame {
     private final Pokedex pokedex;
     private final BattleEngine battleEngine;
 
-    public MapMain() {
+    private JLabel playerNameLabel;
+    private JLabel firstPokemonLabel;
+
+    public MapMain(MapPlayer player) {
         map = new Map();
-        player = new MapPlayer();
+        this.player = player;
         pokedex = GameDataManager.createDefaultPokedex();
         battleEngine = new BattleEngine();
 
-        Pokemon starter = pokedex.getPokemon("피카츄");
-        if (starter != null) player.addPokemon(starter.copy());
-
-        //화면 레이아웃 설정
         setTitle("포켓몬 게임");
         setSize(1200, 800);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        mapPanel = new MapPanel(map, player);
+        mapPanel = new MapPanel(map, this.player);
+
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setLineWrap(true);
@@ -51,10 +51,14 @@ public class MapMain extends JFrame {
         initKeyBindings();
         setVisible(true);
 
+        updatePlayerInfo();
+
         appendLog("포켓몬스터의 세계에 온 걸 환영한다!");
-        appendLog("스타팅 포켓몬: " + player.getFirstPokemonName());
-        appendLog("W / A / S / D 또는 방향키로 이동하세요.");
-        appendLog("현재 위치: " + map.grid[player.y][player.x].getName());
+        appendLog("플레이어 이름: " + this.player.getName());
+        appendLog("스타팅 포켓몬: " + this.player.getFirstPokemonName());
+        appendLog("W / A / S / D 로 이동하세요.");
+        appendLog("현재 위치: " + map.grid[this.player.y][this.player.x].getName());
+
         restoreFocus();
     }
 
@@ -63,6 +67,25 @@ public class MapMain extends JFrame {
         rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
         rightPanel.setPreferredSize(new Dimension(260, 800));
         rightPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("메뉴");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 26));
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        playerNameLabel = new JLabel();
+        playerNameLabel.setFont(new Font("Dialog", Font.PLAIN, 16));
+        playerNameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        firstPokemonLabel = new JLabel();
+        firstPokemonLabel.setFont(new Font("Dialog", Font.PLAIN, 16));
+        firstPokemonLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        rightPanel.add(titleLabel);
+        rightPanel.add(Box.createVerticalStrut(30));
+        rightPanel.add(playerNameLabel);
+        rightPanel.add(Box.createVerticalStrut(8));
+        rightPanel.add(firstPokemonLabel);
+        rightPanel.add(Box.createVerticalStrut(30));
 
         JButton btn1 = createMenuButton("1. 포켓몬 도감 보기", e -> {
             appendLog(pokedex.getAllPokemonText());
@@ -84,10 +107,12 @@ public class MapMain extends JFrame {
         });
 
         JButton btn4 = createMenuButton("4. 파티 회복", e -> {
-            if (player.isPartyEmpty()) appendLog("회복할 포켓몬이 없습니다.");
-            else {
+            if (player.isPartyEmpty()) {
+                appendLog("회복할 포켓몬이 없습니다.");
+            } else {
                 player.healAll();
                 appendLog("파티의 모든 포켓몬이 회복되었습니다.");
+                updatePlayerInfo();
             }
             restoreFocus();
         });
@@ -101,7 +126,10 @@ public class MapMain extends JFrame {
             SaveManager.LoadResult result = SaveManager.loadGameWithMessage();
             player.setParty(result.party);
             appendLog(result.message);
-            if (!player.isPartyEmpty()) appendLog("현재 첫 번째 포켓몬: " + player.getFirstPokemonName());
+            if (!player.isPartyEmpty()) {
+                appendLog("현재 첫 번째 포켓몬: " + player.getFirstPokemonName());
+            }
+            updatePlayerInfo();
             mapPanel.repaint();
             restoreFocus();
         });
@@ -115,18 +143,31 @@ public class MapMain extends JFrame {
             restoreFocus();
         });
 
-        rightPanel.add(btn1); rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(btn2); rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(btn3); rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(btn4); rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(btn5); rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(btn6); rightPanel.add(Box.createVerticalStrut(10));
-        rightPanel.add(btn0); rightPanel.add(Box.createVerticalStrut(20));
+        rightPanel.add(btn1);
+        rightPanel.add(Box.createVerticalStrut(10));
+        rightPanel.add(btn2);
+        rightPanel.add(Box.createVerticalStrut(10));
+        rightPanel.add(btn3);
+        rightPanel.add(Box.createVerticalStrut(10));
+        rightPanel.add(btn4);
+        rightPanel.add(Box.createVerticalStrut(10));
+        rightPanel.add(btn5);
+        rightPanel.add(Box.createVerticalStrut(10));
+        rightPanel.add(btn6);
+        rightPanel.add(Box.createVerticalStrut(10));
+        rightPanel.add(btn0);
+        rightPanel.add(Box.createVerticalStrut(20));
 
         JLabel guide = new JLabel("<html><center>이동 키<br>W / A / S / D</center></html>", SwingConstants.CENTER);
         guide.setAlignmentX(Component.CENTER_ALIGNMENT);
         rightPanel.add(guide);
+
         return rightPanel;
+    }
+
+    private void updatePlayerInfo() {
+        playerNameLabel.setText("플레이어: " + player.getName());
+        firstPokemonLabel.setText("파티 첫 포켓몬: " + player.getFirstPokemonName());
     }
 
     private JButton createMenuButton(String text, java.awt.event.ActionListener listener) {
@@ -135,7 +176,6 @@ public class MapMain extends JFrame {
         button.addActionListener(listener);
         return button;
     }
-
 
     private void initKeyBindings() {
         InputMap inputMap = mapPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -147,16 +187,28 @@ public class MapMain extends JFrame {
         inputMap.put(KeyStroke.getKeyStroke("D"), "moveRight");
 
         actionMap.put("moveUp", new AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('W'); }
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                moveAndHandle('W');
+            }
         });
         actionMap.put("moveLeft", new AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('A'); }
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                moveAndHandle('A');
+            }
         });
         actionMap.put("moveDown", new AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('S'); }
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                moveAndHandle('S');
+            }
         });
         actionMap.put("moveRight", new AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('D'); }
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent e) {
+                moveAndHandle('D');
+            }
         });
     }
 
@@ -175,6 +227,7 @@ public class MapMain extends JFrame {
         } else if (tile == 'F' && Math.random() < 0.4) {
             encounterWildPokemon();
         }
+
         restoreFocus();
     }
 
@@ -190,6 +243,7 @@ public class MapMain extends JFrame {
             appendLog("간호사 조이: \"오래 기다리셨습니다!\"");
             appendLog("간호사 조이: \"맡겨 두신 포켓몬이 모두 건강해졌습니다!\"");
             appendLog("간호사 조이: \"또 이용해 주세요!\"");
+            updatePlayerInfo();
         }
     }
 
@@ -247,8 +301,12 @@ public class MapMain extends JFrame {
             if (capture == JOptionPane.YES_OPTION) {
                 if (Math.random() < 0.5) {
                     wildPokemon.healFull();
-                    if (player.addPokemon(wildPokemon)) appendLog(wildPokemon.getName() + " 포획 성공! 파티에 추가되었습니다.");
-                    else appendLog("파티가 가득 찼습니다! (최대 6마리)");
+                    if (player.addPokemon(wildPokemon)) {
+                        appendLog(wildPokemon.getName() + " 포획 성공! 파티에 추가되었습니다.");
+                        updatePlayerInfo();
+                    } else {
+                        appendLog("파티가 가득 찼습니다! (최대 6마리)");
+                    }
                 } else {
                     appendLog("아깝다! 조금만 더 하면 잡을 수 있었는데!");
                 }
@@ -258,16 +316,19 @@ public class MapMain extends JFrame {
         } else {
             handleAllFainted();
         }
+
         mapPanel.repaint();
     }
 
     private void handleAllFainted() {
         if (!player.isAllFainted()) return;
+
         appendLog("눈앞이 캄캄해졌다...");
         appendLog("가까운 포켓몬센터로 이동합니다...");
         player.moveToCenter();
         player.healAll();
         appendLog("포켓몬이 모두 회복되었습니다!");
+        updatePlayerInfo();
         mapPanel.repaint();
     }
 
