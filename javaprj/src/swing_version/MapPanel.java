@@ -2,11 +2,16 @@ package swing_version;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 
 public class MapPanel extends JPanel {
 
     private final Map map;
     private final MapPlayer player;
+    private BufferedImage playerIcon;
 
     public MapPanel(Map map, MapPlayer player) {
         this.map = map;
@@ -14,6 +19,13 @@ public class MapPanel extends JPanel {
         setBackground(Color.WHITE);
         setPreferredSize(new Dimension(900, 560));
         setFocusable(true);
+
+        try {
+            playerIcon = ImageIO.read(getClass().getResourceAsStream("/swing_version/player_icon.png"));
+        } catch (Exception e) {
+            playerIcon = null;
+            System.out.println("플레이어 아이콘 로드 실패: " + e.getMessage());
+        }
     }
 
     @Override
@@ -52,8 +64,16 @@ public class MapPanel extends JPanel {
                 g.drawString(text, drawX + cellWidth / 2 - 10, drawY + cellHeight / 2);
 
                 if (player.x == x && player.y == y) {
-                    g.setColor(Color.RED);
-                    g.fillOval(drawX + cellWidth / 2 - 15, drawY + cellHeight / 2 - 15, 30, 30);
+                    if (playerIcon != null) {
+                        int iconSize = Math.min(cellWidth, cellHeight) - 4;
+                        g.drawImage(playerIcon,
+                                drawX + cellWidth / 2 - iconSize / 2,
+                                drawY + cellHeight / 2 - iconSize / 2,
+                                iconSize, iconSize, this);
+                    } else {
+                        g.setColor(Color.RED);
+                        g.fillOval(drawX + cellWidth / 2 - 15, drawY + cellHeight / 2 - 15, 30, 30);
+                    }
                 }
             }
         }

@@ -4,11 +4,13 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntSupplier;
 
 public class BattleEngine {
 
     private BattleLogger logger = System.out::println;
     private Component parentComponent;
+    private Runnable logDrainWaiter;
 
     public void setLogger(BattleLogger logger) {
         if (logger != null) this.logger = logger;
@@ -16,6 +18,30 @@ public class BattleEngine {
 
     public void setParentComponent(Component parentComponent) {
         this.parentComponent = parentComponent;
+    }
+
+    public void setLogDrainWaiter(Runnable waiter) {
+        this.logDrainWaiter = waiter;
+    }
+
+    private void waitForLog() {
+        if (logDrainWaiter != null) logDrainWaiter.run();
+    }
+
+    private int invokeDialog(IntSupplier dialogSupplier) {
+        waitForLog();
+        if (SwingUtilities.isEventDispatchThread()) {
+            return dialogSupplier.getAsInt();
+        }
+        int[] result = {-1};
+        try {
+            SwingUtilities.invokeAndWait(() -> result[0] = dialogSupplier.getAsInt());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            e.printStackTrace();
+        }
+        return result[0];
     }
 
     public void setLogArea(JTextArea logArea) {
@@ -191,7 +217,8 @@ public class BattleEngine {
 
     // ─── 전투 승리 후 처리: 레벨업 → 기술 습득 → 진화 체크 ────────────────
     private void handlePostBattle(Pokemon mine, Pokemon defeated) {
-        // 1) 레벨업
+        // 1) 레벨업 (배틀당 2레벨)
+        mine.levelUp();
         mine.levelUp();
         printLog(mine.getName() + "의 레벨이 " + mine.getLevel() + "로 올랐다!");
         printLog(String.format("  HP: %d  ATK: %d", mine.getMaxHp(), mine.getAttack()));
@@ -201,12 +228,12 @@ public class BattleEngine {
         if (learnableName != null) {
             printLog(mine.getName() + "은(는) " + learnableName + "을(를) 떠올렸다!");
             String[] learnOptions = {"배운다", "배우지 않는다"};
-            int learnChoice = JOptionPane.showOptionDialog(
+            int learnChoice = invokeDialog(() -> JOptionPane.showOptionDialog(
                     parentComponent,
                     mine.getName() + "은(는) " + learnableName + "을(를) 배울 수 있다!",
                     "기술 습득",
                     JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
-                    learnOptions, learnOptions[0]);
+                    learnOptions, learnOptions[0]));
             if (learnChoice == 0) {
                 tryLearnSkill(mine, learnableName);
             } else {
@@ -219,12 +246,12 @@ public class BattleEngine {
             String evolvedName = BT_Evolution.getEvolvedName(mine.getName());
             printLog("어라? " + mine.getName() + "의 모습이...!");
             String[] evoOptions = {"진화한다", "진화하지 않는다"};
-            int evoChoice = JOptionPane.showOptionDialog(
+            int evoChoice = invokeDialog(() -> JOptionPane.showOptionDialog(
                     parentComponent,
                     mine.getName() + "이(가) " + evolvedName + "로 진화할 수 있다!",
                     "진화",
                     JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
-                    evoOptions, evoOptions[0]);
+                    evoOptions, evoOptions[0]));
             if (evoChoice == 0) {
                 printLog("축하합니다! " + mine.getName() + "은(는) " + evolvedName + "로 진화했다!");
                 mine.evolve(evolvedName);
@@ -253,12 +280,12 @@ public class BattleEngine {
             }
             options[skills.size()] = skillName + "을(를) 배우지 않는다";
 
-            int choice = JOptionPane.showOptionDialog(
+            int choice = invokeDialog(() -> JOptionPane.showOptionDialog(
                     parentComponent,
                     "이미 기술이 4개입니다. 어떤 기술을 잊게 할까요?",
                     "기술 교체",
                     JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
-                    options, options[0]);
+                    options, options[0]));
 
             if (choice < 0 || choice == skills.size()) {
                 printLog(mine.getName() + "은(는) " + skillName + "을(를) 배우지 않았다.");
@@ -341,7 +368,7 @@ public class BattleEngine {
 
     private int chooseAction(Pokemon mine) {
         String[] options = {"싸운다", "포켓몬 교체", "도망간다"};
-        return JOptionPane.showOptionDialog(
+        return invokeDialog(() -> JOptionPane.showOptionDialog(
                 parentComponent,
                 "행동을 선택하세요.\n현재 포켓몬: " + mine.getName(),
                 "배틀",
@@ -350,7 +377,7 @@ public class BattleEngine {
                 null,
                 options,
                 options[0]
-        );
+        ));
     }
 
     private Skill chooseSkill(Pokemon pokemon) {
@@ -366,7 +393,7 @@ public class BattleEngine {
             options[i] = s.getName() + " | 타입: " + s.getType() + " | 위력: " + s.getPower();
         }
 
-        int choice = JOptionPane.showOptionDialog(
+        int choice = invokeDialog(() -> JOptionPane.showOptionDialog(
                 parentComponent,
                 "사용할 기술을 선택하세요.",
                 pokemon.getName() + "의 기술",
@@ -375,7 +402,7 @@ public class BattleEngine {
                 null,
                 options,
                 options[0]
-        );
+        ));
 
         if (choice < 0 || choice >= moves.size()) return null;
         return moves.get(choice);
@@ -397,7 +424,7 @@ public class BattleEngine {
             return current;
         }
 
-        int choice = JOptionPane.showOptionDialog(
+        int choice = invokeDialog(() -> JOptionPane.showOptionDialog(
                 parentComponent,
                 "교체할 포켓몬을 선택하세요.",
                 "포켓몬 교체",
@@ -406,7 +433,7 @@ public class BattleEngine {
                 null,
                 labels.toArray(),
                 labels.get(0)
-        );
+        ));
 
         if (choice < 0 || choice >= available.size()) return current;
         return available.get(choice);
