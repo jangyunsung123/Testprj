@@ -279,7 +279,7 @@ public class MapMain extends JFrame {
                 invokeOnEDT(() -> choice[0] = JOptionPane.showConfirmDialog(MapMain.this, "싸우시겠습니까?", "체육관", JOptionPane.YES_NO_OPTION));
                 if (choice[0] != JOptionPane.YES_OPTION) return;
 
-                appendLog("전설의 포켓몬이 나타났다!");
+                appendLog("전설의 포켓몬 기라티나가 나타났다!");
                 waitForLogDrain();
 
                 int[] battleChoice = {JOptionPane.NO_OPTION};
