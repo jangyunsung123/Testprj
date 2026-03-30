@@ -10,6 +10,7 @@ public class MapPlayer {
 
     private String name;
     private ArrayList<Pokemon> party = new ArrayList<>();
+    private ArrayList<Pokemon> box = new ArrayList<>();
 
     public String getName() {
         return name == null || name.isBlank() ? "이름없음" : name;
@@ -34,6 +35,25 @@ public class MapPlayer {
         if (pokemon == null || party.size() >= 6) return false;
         party.add(pokemon);
         return true;
+    }
+
+    public int getPartySize() {
+        return party.size();
+    }
+
+    // index 위치의 포켓몬을 newPokemon으로 교체하고, 원래 포켓몬을 반환
+    public Pokemon swapPokemon(int index, Pokemon newPokemon) {
+        Pokemon old = party.get(index);
+        party.set(index, newPokemon);
+        return old;
+    }
+
+    public void addToBox(Pokemon pokemon) {
+        if (pokemon != null) box.add(pokemon);
+    }
+
+    public ArrayList<Pokemon> getBox() {
+        return box;
     }
 
     public boolean isPartyEmpty() {

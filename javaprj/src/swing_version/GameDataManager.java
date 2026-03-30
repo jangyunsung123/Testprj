@@ -252,7 +252,7 @@ class GameDataManager {
 				"Wild", Arrays.asList(charm, tackle, null, null)));
 
 		// 기라티나 (고스트/드래곤) - 전설 포켓몬, 처음부터 4슬롯 풀
-		pokedex.addPokemon(new Pokemon("기라티나",  30, 250, 70, "고스트/드래곤",
+		pokedex.addPokemon(new Pokemon("기라티나",  30, 700, 135, "고스트/드래곤",
 				"Legendary", Arrays.asList(shadowDive, dragonPulse, shadowBall, dragonClaw)));
 
 		// ─── 스타팅 포켓몬 3마리 (Starter) ───────────────────────────────────

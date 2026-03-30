@@ -2,8 +2,11 @@ package swing_version;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class MapMain extends JFrame {
 
@@ -14,6 +17,9 @@ public class MapMain extends JFrame {
     private final BattleEngine battleEngine;
 
     private final JPanel logPanel;
+    private final ConcurrentLinkedQueue<String> logQueue = new ConcurrentLinkedQueue<>();
+    private volatile boolean isTyping = false;
+    private volatile boolean inBattle = false;
     private final JScrollPane logScrollPane;
 
     private JLabel playerNameLabel;
@@ -26,7 +32,7 @@ public class MapMain extends JFrame {
         battleEngine = new BattleEngine();
 
         setTitle("포켓몬 게임");
-        setSize(1200, 900);
+        setSize(1200, 1050);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -47,12 +53,13 @@ public class MapMain extends JFrame {
                 JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
         );
-        logScrollPane.setPreferredSize(new Dimension(1200, 340));
+        logScrollPane.setPreferredSize(new Dimension(1200, 480));
         logScrollPane.setBorder(BorderFactory.createTitledBorder("로그"));
         logScrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
         battleEngine.setParentComponent(this);
         battleEngine.setLogger(this::appendLog);
+        battleEngine.setLogDrainWaiter(this::waitForLogDrain);
 
         add(gamePanel, BorderLayout.CENTER);
         add(logScrollPane, BorderLayout.SOUTH);
@@ -69,6 +76,14 @@ public class MapMain extends JFrame {
         appendLog("현재 위치: " + map.grid[this.player.y][this.player.x].getName());
 
         restoreFocus();
+    }
+
+    // 로그 타이핑이 모두 끝날 때까지 백그라운드 스레드에서 대기
+    public void waitForLogDrain() {
+        while (isTyping || !logQueue.isEmpty()) {
+            try { Thread.sleep(50); } catch (InterruptedException e) { return; }
+        }
+        try { Thread.sleep(300); } catch (InterruptedException e) {}
     }
 
     private JPanel createRightPanel() {
@@ -97,7 +112,7 @@ public class MapMain extends JFrame {
         rightPanel.add(Box.createVerticalStrut(30));
 
         JButton btn1 = createMenuButton("1. 포켓몬 도감 보기", e -> {
-            appendLog(pokedex.getAllPokemonText());
+            appendLogInstant(pokedex.getAllPokemonText(getCaughtNames()));
             restoreFocus();
         });
 
@@ -175,8 +190,10 @@ public class MapMain extends JFrame {
     }
 
     private void updatePlayerInfo() {
-        playerNameLabel.setText("플레이어: " + player.getName());
-        firstPokemonLabel.setText("파티 첫 포켓몬: " + player.getFirstPokemonName());
+        SwingUtilities.invokeLater(() -> {
+            playerNameLabel.setText("플레이어: " + player.getName());
+            firstPokemonLabel.setText("파티 첫 포켓몬: " + player.getFirstPokemonName());
+        });
     }
 
     private JButton createMenuButton(String text, java.awt.event.ActionListener listener) {
@@ -196,32 +213,21 @@ public class MapMain extends JFrame {
         inputMap.put(KeyStroke.getKeyStroke("D"), "moveRight");
 
         actionMap.put("moveUp", new AbstractAction() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                moveAndHandle('W');
-            }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('W'); }
         });
         actionMap.put("moveLeft", new AbstractAction() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                moveAndHandle('A');
-            }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('A'); }
         });
         actionMap.put("moveDown", new AbstractAction() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                moveAndHandle('S');
-            }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('S'); }
         });
         actionMap.put("moveRight", new AbstractAction() {
-            @Override
-            public void actionPerformed(java.awt.event.ActionEvent e) {
-                moveAndHandle('D');
-            }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { moveAndHandle('D'); }
         });
     }
 
     private void moveAndHandle(char input) {
+        if (inBattle) return;
         map.move(player, input);
         mapPanel.repaint();
         appendLog("현재 위치: " + map.grid[player.y][player.x].getName());
@@ -261,80 +267,153 @@ public class MapMain extends JFrame {
         appendLog("안녕하세요! 미래의 챔피언! 체육관에 도전해주셔서 감사합니다!");
         appendLog("오호... " + player.getFirstPokemonName() + "와(과) 함께 왔군요.");
         appendLog(player.getFirstPokemonName() + "의 힘을 시험해보겠습니다!");
-        appendLog("체육관 관장이 승부를 걸어왔다!");
+        appendLog("부숴버려라! 기라티나!");
+        appendLog("체육관 관장 월로가 승부를 걸어왔다!");
 
-        int choice = JOptionPane.showConfirmDialog(this, "싸우시겠습니까?", "체육관", JOptionPane.YES_NO_OPTION);
-        if (choice != JOptionPane.YES_OPTION) return;
+        inBattle = true;
+        new Thread(() -> {
+            try {
+                waitForLogDrain();
 
-        appendLog("전설의 포켓몬이 나타났다!");
-        int battleChoice = JOptionPane.showConfirmDialog(this, "계속 싸우시겠습니까?", "체육관 배틀", JOptionPane.YES_NO_OPTION);
+                int[] choice = {JOptionPane.NO_OPTION};
+                invokeOnEDT(() -> choice[0] = JOptionPane.showConfirmDialog(MapMain.this, "싸우시겠습니까?", "체육관", JOptionPane.YES_NO_OPTION));
+                if (choice[0] != JOptionPane.YES_OPTION) return;
 
-        if (battleChoice == JOptionPane.YES_OPTION) {
-            appendLog("전투를 시작합니다!");
-            Pokemon legendaryPokemon = pokedex.getPokemon("기라티나");
-            if (legendaryPokemon != null) {
-                boolean won = battleEngine.startBattle(player.getParty(), legendaryPokemon.copy());
-                if (won) {
-                    appendLog("체육관에서 승리했습니다!");
+                appendLog("전설의 포켓몬 기라티나가 나타났다!");
+                waitForLogDrain();
+
+                int[] battleChoice = {JOptionPane.NO_OPTION};
+                invokeOnEDT(() -> battleChoice[0] = JOptionPane.showConfirmDialog(MapMain.this, "계속 싸우시겠습니까?", "체육관 배틀", JOptionPane.YES_NO_OPTION));
+
+                if (battleChoice[0] == JOptionPane.YES_OPTION) {
+                    appendLog("전투를 시작합니다!");
+                    Pokemon legendaryPokemon = pokedex.getPokemon("기라티나");
+                    if (legendaryPokemon != null) {
+                        boolean won = battleEngine.startBattle(player.getParty(), legendaryPokemon.copy());
+                        if (won) {
+                            appendLog("체육관에서 승리했습니다!");
+                        } else {
+                            SwingUtilities.invokeLater(this::handleAllFainted);
+                        }
+                    }
                 } else {
-                    handleAllFainted();
+                    if (new Random().nextInt(100) < 2) {
+                        appendLog("안돼! 트레이너 배틀 중에 상대에게 등을 보일 수는 없다!");
+                        appendLog("체육관 관장이 당신을 막아섰다!");
+                    } else {
+                        appendLog("무사히 도망쳤습니다!");
+                    }
                 }
+            } finally {
+                inBattle = false;
+                SwingUtilities.invokeLater(() -> mapPanel.repaint());
             }
-        } else {
-            if (new Random().nextInt(100) < 2) {
-                appendLog("안돼! 트레이너 배틀 중에 상대에게 등을 보일 수는 없다!");
-                appendLog("체육관 관장이 당신을 막아섰다!");
-            } else {
-                appendLog("무사히 도망쳤습니다!");
-            }
-        }
+        }).start();
     }
 
     private void visitTown() {
         appendLog("oo마을에 도착했습니다!");
     }
 
+    private Set<String> getCaughtNames() {
+        Set<String> names = new HashSet<>();
+        for (Pokemon p : player.getParty()) names.add(p.getName());
+        for (Pokemon p : player.getBox())   names.add(p.getName());
+        return names;
+    }
+
     private void encounterWildPokemon() {
         List<Pokemon> wildList = pokedex.getByRarity("Wild");
-        if (wildList.isEmpty()) {
-            appendLog("포획 가능한 야생 포켓몬이 없습니다.");
-            return;
-        }
-        if (player.isPartyEmpty()) {
-            appendLog("파티가 비어 있어 전투를 할 수 없습니다.");
-            return;
-        }
+        if (wildList.isEmpty()) { appendLog("포획 가능한 야생 포켓몬이 없습니다."); return; }
+        if (player.isPartyEmpty()) { appendLog("파티가 비어 있어 전투를 할 수 없습니다."); return; }
 
         Pokemon wildPokemon = wildList.get((int) (Math.random() * wildList.size())).copy();
-        boolean won = battleEngine.startBattle(player.getParty(), wildPokemon);
 
-        if (won) {
-            int capture = JOptionPane.showConfirmDialog(this, wildPokemon.getName() + "을(를) 포획할까요?", "포획 시도", JOptionPane.YES_NO_OPTION);
-            if (capture == JOptionPane.YES_OPTION) {
-                if (Math.random() < 0.5) {
-                    wildPokemon.healFull();
-                    if (player.addPokemon(wildPokemon)) {
-                        appendLog(wildPokemon.getName() + " 포획 성공! 파티에 추가되었습니다.");
-                        updatePlayerInfo();
+        inBattle = true;
+        new Thread(() -> {
+            try {
+                boolean won = battleEngine.startBattle(player.getParty(), wildPokemon);
+
+                if (won) {
+                    waitForLogDrain();
+
+                    int[] capture = {JOptionPane.NO_OPTION};
+                    invokeOnEDT(() -> capture[0] = JOptionPane.showConfirmDialog(MapMain.this,
+                            wildPokemon.getName() + "을(를) 포획할까요?", "포획 시도", JOptionPane.YES_NO_OPTION));
+
+                    if (capture[0] == JOptionPane.YES_OPTION) {
+                        if (Math.random() < 0.9) {
+                            wildPokemon.healFull();
+                            String[] destOptions = {"파티에 추가", "박스로 이동"};
+                            int[] dest = {-1};
+                            invokeOnEDT(() -> dest[0] = JOptionPane.showOptionDialog(MapMain.this,
+                                    wildPokemon.getName() + "을(를) 어떻게 할까요?", "포획 성공!",
+                                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+                                    null, destOptions, destOptions[0]));
+
+                            if (dest[0] == 0) {
+                                if (player.addPokemon(wildPokemon)) {
+                                    appendLog(wildPokemon.getName() + " 포획 성공! 파티에 추가되었습니다.");
+                                    updatePlayerInfo();
+                                } else {
+                                    int[] swap = {JOptionPane.NO_OPTION};
+                                    invokeOnEDT(() -> swap[0] = JOptionPane.showConfirmDialog(MapMain.this,
+                                            "파티가 꽉 찼습니다. 교체하시겠습니까?", "파티 교체", JOptionPane.YES_NO_OPTION));
+                                    if (swap[0] == JOptionPane.YES_OPTION) {
+                                        List<Pokemon> party = player.getParty();
+                                        String[] partyNames = new String[party.size()];
+                                        for (int i = 0; i < party.size(); i++) {
+                                            partyNames[i] = (i + 1) + ". " + party.get(i).getName()
+                                                    + " | Lv." + party.get(i).getLevel()
+                                                    + " | HP " + party.get(i).getMaxHp();
+                                        }
+                                        int[] selected = {-1};
+                                        invokeOnEDT(() -> selected[0] = JOptionPane.showOptionDialog(MapMain.this,
+                                                "교체할 포켓몬을 선택해주세요", "포켓몬 교체",
+                                                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+                                                null, partyNames, partyNames[0]));
+                                        if (selected[0] >= 0) {
+                                            Pokemon replaced = player.swapPokemon(selected[0], wildPokemon);
+                                            player.addToBox(replaced);
+                                            appendLog(replaced.getName() + "을(를) 박스로 이동했습니다!");
+                                            appendLog(wildPokemon.getName() + " 포획 성공! 파티에 추가되었습니다.");
+                                            updatePlayerInfo();
+                                        }
+                                    }
+                                }
+                            } else if (dest[0] == 1) {
+                                player.addToBox(wildPokemon);
+                                appendLog(wildPokemon.getName() + "을(를) 박스로 이동했습니다!");
+                            }
+                        } else {
+                            appendLog("아깝다! 조금만 더 하면 잡을 수 있었는데!");
+                        }
                     } else {
-                        appendLog("파티가 가득 찼습니다! (최대 6마리)");
+                        appendLog("포획하지 않고 지나갔습니다.");
                     }
                 } else {
-                    appendLog("아깝다! 조금만 더 하면 잡을 수 있었는데!");
+                    SwingUtilities.invokeLater(this::handleAllFainted);
                 }
-            } else {
-                appendLog("포획하지 않고 지나갔습니다.");
+            } finally {
+                inBattle = false;
+                SwingUtilities.invokeLater(() -> mapPanel.repaint());
             }
-        } else {
-            handleAllFainted();
-        }
+        }).start();
+    }
 
-        mapPanel.repaint();
+    // JOptionPane을 EDT에서 안전하게 실행하는 헬퍼
+    private void invokeOnEDT(Runnable r) {
+        try {
+            SwingUtilities.invokeAndWait(r);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 
     private void handleAllFainted() {
         if (!player.isAllFainted()) return;
-
         appendLog("눈앞이 캄캄해졌다...");
         appendLog("가까운 포켓몬센터로 이동합니다...");
         player.moveToCenter();
@@ -348,13 +427,44 @@ public class MapMain extends JFrame {
         SwingUtilities.invokeLater(() -> mapPanel.requestFocusInWindow());
     }
 
+    // 타이핑 효과 없이 즉시 표시 (도감 등 긴 텍스트용)
+    private void appendLogInstant(String message) {
+        if (message == null) return;
+        SwingUtilities.invokeLater(() -> {
+            logPanel.add(BT_Dialog.createMessageBoxInstant(message));
+            logPanel.revalidate();
+            logPanel.repaint();
+            SwingUtilities.invokeLater(() -> {
+                JScrollBar bar = logScrollPane.getVerticalScrollBar();
+                bar.setValue(bar.getMaximum());
+            });
+        });
+    }
+
+    // appendLog는 백그라운드 스레드에서도 안전하게 호출 가능
     private void appendLog(String message) {
         if (message == null) return;
+        logQueue.add(message);
+        SwingUtilities.invokeLater(() -> { if (!isTyping) processNextLog(); });
+    }
 
-        logPanel.add(BT_Dialog.createMessageBox(message));
+    private void processNextLog() {
+        if (logQueue.isEmpty()) {
+            isTyping = false;
+            return;
+        }
+        isTyping = true;
+        String message = logQueue.poll();
+        logPanel.add(BT_Dialog.createMessageBox(message, () -> {
+            Timer delay = new Timer(200, e -> {
+                ((Timer) e.getSource()).stop();
+                processNextLog();
+            });
+            delay.setRepeats(false);
+            delay.start();
+        }));
         logPanel.revalidate();
         logPanel.repaint();
-
         SwingUtilities.invokeLater(() -> {
             JScrollBar bar = logScrollPane.getVerticalScrollBar();
             bar.setValue(bar.getMaximum());

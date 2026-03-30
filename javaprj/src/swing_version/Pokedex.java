@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 class Pokedex {
     private final Map<String, Skill> skillDb;
@@ -46,9 +47,43 @@ class Pokedex {
               .append(p.getMaxHp())
               .append(" | ATK ")
               .append(p.getAttack())
-              .append(" | 등급: ")
+              .append(" | 분류: ")
               .append(p.getRarity())
               .append("\n");
+            idx++;
+        }
+        return sb.toString().trim();
+    }
+
+    // 포획한 포켓몬만 정보 표시, 미포획은 ??? 처리
+    public String getAllPokemonText(Set<String> caughtNames) {
+        StringBuilder sb = new StringBuilder("==== 포켓몬 도감 ====\n");
+        int idx = 1;
+        for (Pokemon p : pokemonDb.values()) {
+            if (caughtNames.contains(p.getName())) {
+                sb.append(idx)
+                  .append(". ")
+                  .append(p.getName())
+                  .append(" | 타입: ")
+                  .append(p.getType())
+                  .append(" | Lv.")
+                  .append(p.getLevel())
+                  .append(" | HP ")
+                  .append(p.getMaxHp())
+                  .append(" | ATK ")
+                  .append(p.getAttack())
+                  .append(" | 분류: ")
+                  .append(p.getRarity());
+            } else {
+                sb.append(idx)
+                  .append(". ???")
+                  .append(" | 타입: ???")
+                  .append(" | Lv.???")
+                  .append(" | HP ???")
+                  .append(" | ATK ???")
+                  .append(" | 분류: ???");
+            }
+            sb.append("\n");
             idx++;
         }
         return sb.toString().trim();
@@ -64,7 +99,7 @@ class Pokedex {
         sb.append("레벨: ").append(p.getLevel()).append("\n");
         sb.append("HP: ").append(p.getCurrentHp()).append("/").append(p.getMaxHp()).append("\n");
         sb.append("ATK: ").append(p.getAttack()).append("\n");
-        sb.append("등급: ").append(p.getRarity()).append("\n");
+        sb.append("분류: ").append(p.getRarity()).append("\n");
         sb.append("스킬 목록:\n");
         for (Skill s : p.getSkills()) {
             sb.append(" - ")
@@ -87,7 +122,7 @@ class Pokedex {
         for (Pokemon p : pokemonDb.values()) {
             BT_Dialog.show(idx + ". " + p.getName() + " | 타입: " + p.getType()
                     + " | Lv." + p.getLevel() + " | HP " + p.getMaxHp()
-                    + " | ATK " + p.getAttack() + " | 등급: " + p.getRarity());
+                    + " | ATK " + p.getAttack() + " | 분류: " + p.getRarity());
             idx++;
         }
     }
@@ -100,7 +135,7 @@ class Pokedex {
         BT_Dialog.show("레벨: " + p.getLevel());
         BT_Dialog.show("HP: " + p.getCurrentHp() + "/" + p.getMaxHp());
         BT_Dialog.show("ATK: " + p.getAttack());
-        BT_Dialog.show("등급: " + p.getRarity());
+        BT_Dialog.show("분류: " + p.getRarity());
         BT_Dialog.show("스킬 목록:");
         for (Skill s : p.getSkills()) {
             BT_Dialog.show("  - " + s.getName() + " (" + s.getType() + ")"

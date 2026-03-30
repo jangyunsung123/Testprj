@@ -97,7 +97,11 @@ public class StartGame {
         }
 
         private void appendMessage(String message) {
-            logPanel.add(BT_Dialog.createMessageBox(message));
+            appendMessage(message, null);
+        }
+
+        private void appendMessage(String message, Runnable onComplete) {
+            logPanel.add(BT_Dialog.createMessageBox(message, onComplete));
             logPanel.revalidate();
             logPanel.repaint();
 
@@ -127,65 +131,63 @@ public class StartGame {
 
         private void playMessages(String[] messages, Runnable after) {
             clearControls();
+            playMessageAt(messages, 0, after);
+        }
 
-            final int[] index = {0};
-
-            timer = new Timer(AUTO_DELAY, e -> {
-                if (index[0] < messages.length) {
-                    appendMessage(messages[index[0]]);
-                    index[0]++;
-                } else {
+        private void playMessageAt(String[] messages, int index, Runnable after) {
+            if (index >= messages.length) {
+                if (after != null) after.run();
+                return;
+            }
+            appendMessage(messages[index], () -> {
+                // 타이핑 완료 후 짧은 딜레이를 두고 다음 메시지 출력
+                timer = new Timer(300, e -> {
                     timer.stop();
                     timer = null;
-                    if (after != null) {
-                        after.run();
-                    }
-                }
+                    playMessageAt(messages, index + 1, after);
+                });
+                timer.setRepeats(false);
+                timer.start();
             });
-
-            timer.setInitialDelay(0);
-            timer.start();
         }
 
         private void showChoiceButtons(String message, String[] choices, IntConsumer consumer) {
             clearControls();
-            appendMessage(message);
-
-            controlPanel.setVisible(true);
-
-            for (int i = 0; i < choices.length; i++) {
-                final int idx = i;
-                JButton button = new JButton(choices[i]);
-                button.setFont(new Font("Dialog", Font.BOLD, 15));
-                button.addActionListener(e -> {
-                    clearControls();
-                    consumer.accept(idx);
-                });
-                controlPanel.add(button);
-            }
-
-            controlPanel.revalidate();
-            controlPanel.repaint();
+            appendMessage(message, () -> {
+                controlPanel.setVisible(true);
+                for (int i = 0; i < choices.length; i++) {
+                    final int idx = i;
+                    JButton button = new JButton(choices[i]);
+                    button.setFont(new Font("Dialog", Font.BOLD, 15));
+                    button.addActionListener(e -> {
+                        clearControls();
+                        consumer.accept(idx);
+                    });
+                    controlPanel.add(button);
+                }
+                controlPanel.revalidate();
+                controlPanel.repaint();
+            });
         }
 
         private void showTextInput(String message, String buttonText, Consumer<String> consumer) {
             clearControls();
-            appendMessage(message);
+            appendMessage(message, () -> {
+                inputField.setVisible(true);
+                controlPanel.setVisible(true);
 
-            inputField.setVisible(true);
-            controlPanel.setVisible(true);
+                JButton okButton = new JButton(buttonText);
+                okButton.setFont(new Font("Dialog", Font.BOLD, 15));
+                okButton.addActionListener(e -> consumer.accept(inputField.getText().trim()));
 
-            JButton okButton = new JButton(buttonText);
-            okButton.setFont(new Font("Dialog", Font.BOLD, 15));
-            okButton.addActionListener(e -> consumer.accept(inputField.getText().trim()));
+                controlPanel.add(okButton);
+                getRootPane().setDefaultButton(okButton);
 
-            controlPanel.add(okButton);
-            getRootPane().setDefaultButton(okButton);
+                controlPanel.revalidate();
+                controlPanel.repaint();
 
-            controlPanel.revalidate();
-            controlPanel.repaint();
-
-            SwingUtilities.invokeLater(() -> inputField.requestFocusInWindow());
+                SwingUtilities.invokeLater(() -> inputField.requestFocusInWindow());
+            });
         }
 
         private void askGender() {
@@ -230,10 +232,29 @@ public class StartGame {
         }
 
         private void showStarterList() {
-            appendStarterInfo(starters[0], 1);
-            appendStarterInfo(starters[1], 2);
-            appendStarterInfo(starters[2], 3);
-            askStarterChoice();
+            showStarterAt(0);
+        }
+
+        private void showStarterAt(int idx) {
+            if (idx >= starters.length) {
+                askStarterChoice();
+                return;
+            }
+            String text =
+                    (idx + 1) + ". " + starters[idx].name + "\n" +
+                    "타입: " + starters[idx].type + "\n" +
+                    "키: " + starters[idx].height + "m\n" +
+                    "몸무게: " + starters[idx].weight + "kg\n" +
+                    "설명: " + starters[idx].description;
+            appendMessage(text, () -> {
+                timer = new Timer(300, e -> {
+                    timer.stop();
+                    timer = null;
+                    showStarterAt(idx + 1);
+                });
+                timer.setRepeats(false);
+                timer.start();
+            });
         }
 
         private void appendStarterInfo(StartingPokemon p, int number) {
